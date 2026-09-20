@@ -1,0 +1,27 @@
+# ── Build output ──
+build/
+dist/
+target/
+*.class
+*.jar
+*.war
+
+# ── NetBeans ──
+nbproject/private/
+
+# ── Apache Derby database (generated at runtime) ──
+XOGameDB/
+derby.log
+
+# ── Oversized audio (322MB WAV is over GitHub's 100MB limit) ──
+# Compress bg.wav to mp3 to include it instead — see notes.
+bg.wav
+
+# ── IDE / editor ──
+.idea/
+*.iml
+.vscode/
+
+# ── OS junk ──
+.DS_Store
+Thumbs.db
