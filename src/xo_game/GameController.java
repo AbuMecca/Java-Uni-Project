@@ -30,12 +30,17 @@ import javafx.scene.media.AudioClip;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import javafx.scene.paint.Color;
-
 import java.net.URL;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
+/**
+ * GameController:
+ * Manages the X&O game flow with timer, scoreboard, image symbols,
+ * and background/voice audio. Audio is optional: if any sound file
+ * is missing or cannot be played, that sound is simply skipped.
+ */
 public class GameController {
     private static final int GRID_SIZE = 3;
 
@@ -47,7 +52,7 @@ public class GameController {
     private final DatabaseManager db = new DatabaseManager();
     private int gamesPlayed = 0;
 
-    // Audio
+    // Audio (may be null if a file is missing/unplayable)
     private AudioClip bgMusic, xClick, oClick;
 
     public GameController(Stage stage) {
@@ -58,21 +63,17 @@ public class GameController {
         // 1) Prompt for tags
         String tag1 = prompt("Player 1: enter your tag");
         String tag2 = prompt("Player 2: enter your tag");
-
         // 2) Pick symbol images
         Image img1 = chooseImage(tag1 + ": choose your symbol");
         Image img2 = chooseImage(tag2 + ": choose your symbol");
-
-        // 3) Load & play audio (mp3)
+        // 3) Load & play audio
         initAudio();
-
         // 4) Randomize who is X/O
-        List<Character> syms = Arrays.asList('X','O');
+        List<Character> syms = Arrays.asList('X', 'O');
         Collections.shuffle(syms);
         p1 = new Player(tag1, syms.get(0), img1);
         p2 = new Player(tag2, syms.get(1), img2);
         current = p1;
-
         // 5) Build the UI
         buildUI();
     }
@@ -81,33 +82,50 @@ public class GameController {
         TextInputDialog dlg = new TextInputDialog();
         dlg.setHeaderText(text);
         return dlg.showAndWait()
-                  .orElseThrow(() -> new RuntimeException("Cancelled"));
+            .orElseThrow(() -> new RuntimeException("Cancelled"));
     }
 
     private Image chooseImage(String title) {
         FileChooser fc = new FileChooser();
         fc.setTitle(title);
         fc.getExtensionFilters().addAll(
-            new FileChooser.ExtensionFilter("Image files","*.png","*.jpg","*.gif"),
-            new FileChooser.ExtensionFilter("All files","*.*")
+            new FileChooser.ExtensionFilter("Image files", "*.png", "*.jpg", "*.gif"),
+            new FileChooser.ExtensionFilter("All files", "*.*")
         );
         java.io.File f = fc.showOpenDialog(primaryStage);
-        if (f==null) throw new RuntimeException("No image selected");
+        if (f == null) throw new RuntimeException("No image selected");
         return new Image(f.toURI().toString());
     }
 
+    /**
+     * Loads audio from the /audio folder on the classpath.
+     * Background music is now bg.mp3 (much smaller than bg.wav).
+     * Any missing or unplayable file is skipped so the game still runs.
+     */
     private void initAudio() {
-        // *** load your mp3s from /audio folder on classpath
-        URL bg = getClass().getResource("/audio/bg.wav");
-        URL xs = getClass().getResource("/audio/X.wav");
-        URL os = getClass().getResource("/audio/O.wav");
-        if (bg==null||xs==null||os==null)
-            throw new RuntimeException("Audio missing under /audio (must be bg.wav, X.wav, O.wav)");
-        bgMusic = new AudioClip(bg.toExternalForm());
-        bgMusic.setCycleCount(AudioClip.INDEFINITE);
-        bgMusic.play();
-        xClick = new AudioClip(xs.toExternalForm());
-        oClick = new AudioClip(os.toExternalForm());
+        bgMusic = loadClip("/audio/bg.mp3");
+        xClick  = loadClip("/audio/X.wav");
+        oClick  = loadClip("/audio/O.wav");
+
+        if (bgMusic != null) {
+            bgMusic.setCycleCount(AudioClip.INDEFINITE);
+            bgMusic.play();
+        }
+    }
+
+    /** Loads one AudioClip, returning null if it is missing or can't be played. */
+    private AudioClip loadClip(String path) {
+        try {
+            URL url = getClass().getResource(path);
+            if (url == null) {
+                System.out.println("Audio not found (skipping): " + path);
+                return null;
+            }
+            return new AudioClip(url.toExternalForm());
+        } catch (Exception e) {
+            System.out.println("Could not load audio (skipping): " + path);
+            return null;
+        }
     }
 
     private void buildUI() {
@@ -123,20 +141,21 @@ public class GameController {
         top.setPadding(new Insets(10));
         root.setTop(top);
 
-        // Center: 3×3 grid
+        // Center: 3x3 grid
         GridPane grid = new GridPane();
-        for (int i=0; i<GRID_SIZE; i++) {
+        for (int i = 0; i < GRID_SIZE; i++) {
             ColumnConstraints cc = new ColumnConstraints();
-            cc.setPercentWidth(100.0/GRID_SIZE);
+            cc.setPercentWidth(100.0 / GRID_SIZE);
             cc.setHgrow(Priority.ALWAYS);
             grid.getColumnConstraints().add(cc);
+
             RowConstraints rc = new RowConstraints();
-            rc.setPercentHeight(100.0/GRID_SIZE);
+            rc.setPercentHeight(100.0 / GRID_SIZE);
             rc.setVgrow(Priority.ALWAYS);
             grid.getRowConstraints().add(rc);
         }
-        for (int r=0; r<GRID_SIZE; r++) {
-            for (int c=0; c<GRID_SIZE; c++) {
+        for (int r = 0; r < GRID_SIZE; r++) {
+            for (int c = 0; c < GRID_SIZE; c++) {
                 Button b = new Button();
                 b.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
                 // default black background + white border
@@ -147,9 +166,9 @@ public class GameController {
                 ));
                 b.setBorder(new Border(
                     new BorderStroke(Color.WHITE, BorderStrokeStyle.SOLID,
-                                     CornerRadii.EMPTY, new BorderWidths(3))
+                        CornerRadii.EMPTY, new BorderWidths(3))
                 ));
-                final int rr=r, cc=c;
+                final int rr = r, cc = c;
                 b.setOnAction(e -> cellClick(b, rr, cc));
                 grid.add(b, c, r);
             }
@@ -166,9 +185,9 @@ public class GameController {
         primaryStage.setScene(scene);
         primaryStage.setTitle("X&O Local");
         primaryStage.setMaximized(true);
-        primaryStage.setOnCloseRequest(e->{
-            if (turnTimer!=null) turnTimer.stop();
-            bgMusic.stop();
+        primaryStage.setOnCloseRequest(e -> {
+            if (turnTimer != null) turnTimer.stop();
+            if (bgMusic != null) bgMusic.stop();
             Platform.exit();
         });
         primaryStage.show();
@@ -181,16 +200,17 @@ public class GameController {
         // skip if already played
         if (!b.getBackground().getImages().isEmpty()) return;
 
-        // 1) sound
+        // 1) sound (skip silently if the clip is missing)
         char sym = current.getSymbol();
-        (sym=='X' ? xClick : oClick).play();
+        AudioClip clip = (sym == 'X' ? xClick : oClick);
+        if (clip != null) clip.play();
 
         // 2) paint with a BackgroundImage that fills the button
         BackgroundImage bi = new BackgroundImage(
             current.getSymbolImage(),
             BackgroundRepeat.NO_REPEAT, BackgroundRepeat.NO_REPEAT,
             BackgroundPosition.CENTER,
-            new BackgroundSize(1,1,true,true,false,false)
+            new BackgroundSize(1, 1, true, true, false, false)
         );
         b.setBackground(new Background(
             Collections.singletonList(
@@ -200,12 +220,13 @@ public class GameController {
         ));
         b.setBorder(new Border(
             new BorderStroke(Color.WHITE, BorderStrokeStyle.SOLID,
-                             CornerRadii.EMPTY, new BorderWidths(3))
+                CornerRadii.EMPTY, new BorderWidths(3))
         ));
 
         // 3) game logic
-        board.setCell(r,c,sym);
+        board.setCell(r, c, sym);
         turnTimer.stop();
+
         if (board.hasWinner(sym)) {
             showResult(current);
         } else if (board.isFull()) {
@@ -222,32 +243,34 @@ public class GameController {
     }
 
     private void switchPlayer() {
-        current = (current==p1 ? p2 : p1);
+        current = (current == p1 ? p2 : p1);
         nameLabel.setText("Player: " + current.getGamerTag());
     }
 
     private void showResult(Player winner) {
-        String msg = (winner==null ? "Draw!" : winner.getGamerTag()+" wins!");
+        String msg = (winner == null ? "Draw!" : winner.getGamerTag() + " wins!");
         new Alert(Alert.AlertType.INFORMATION, msg).showAndWait();
 
         db.saveGame(new Score(
             p1.getGamerTag(),
             p2.getGamerTag(),
-            winner==null? "Draw" : winner.getGamerTag()
+            winner == null ? "Draw" : winner.getGamerTag()
         ));
-        if (++gamesPlayed>=10) {
+
+        if (++gamesPlayed >= 10) {
             db.resetGames();
-            gamesPlayed=0;
+            gamesPlayed = 0;
         }
+
         resetBoard();
     }
 
     private void resetBoard() {
         board.clear();
-        GridPane grid = (GridPane)((BorderPane)primaryStage
-                          .getScene().getRoot()).getCenter();
+        GridPane grid = (GridPane) ((BorderPane) primaryStage
+            .getScene().getRoot()).getCenter();
         grid.getChildren().forEach(node -> {
-            Button b = (Button)node;
+            Button b = (Button) node;
             b.setBackground(new Background(
                 Collections.singletonList(
                     new BackgroundFill(Color.BLACK, CornerRadii.EMPTY, Insets.EMPTY)
@@ -255,7 +278,7 @@ public class GameController {
             ));
             b.setBorder(new Border(
                 new BorderStroke(Color.WHITE, BorderStrokeStyle.SOLID,
-                                 CornerRadii.EMPTY, new BorderWidths(3))
+                    CornerRadii.EMPTY, new BorderWidths(3))
             ));
         });
     }
